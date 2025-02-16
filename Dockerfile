@@ -15,6 +15,7 @@ ENV PATH="/root/.local/bin/:$PATH"
 
 RUN useradd -ms /bin/bash appuser
 
+RUN mkdir -p /data
 WORKDIR /app
 
 COPY .env /app/.env  
