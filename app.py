@@ -286,7 +286,7 @@ function_definitions_llm = [
                 "filepath": {
                     "type": "string",
                     "pattern": r"^/data/.*",
-                    # "description": "Filepath must start with /data to ensure secure access."
+                    "description": "Filepath must start with /data to ensure secure access."
                 }
             },
             "required": ["filepath"]
@@ -310,6 +310,30 @@ function_definitions_llm = [
                 }
             },
             "required": ["url", "save_path"]
+        }
+    },
+    {
+        "name": "B4",
+        "description": "Clone a Git repository, make a commit, and push changes using an LLM agent.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "repo_url": {
+                    "type": "string",
+                    "pattern": r"https?://.*\.git",  
+                    "description": "URL of the Git repository to clone."
+                },
+                "branch": {
+                    "type": "string",
+                    "description": "Branch to checkout (optional, defaults to 'main').",
+                    "default": "main"
+                },
+                "commit_message": {
+                    "type": "string",
+                    "description": "Commit message."
+                }
+            },
+            "required": ["repo_url", "commit_message"]
         }
     },
     {
@@ -387,6 +411,16 @@ function_definitions_llm = [
         }
     },
     {
+        "name": "B8",
+        "description": "Transcribe audio file to text",
+        "parameters": {
+            "type": "object",
+            "properties": {"input_file": {"type": "string"}, "output_file": {"type": "string"}},
+                "required": ["input_file", "output_file"]
+        }
+    },
+    
+    {
         "name": "B9",
         "description": "Convert a Markdown file to another format and save the result to the specified output path.",
         "parameters": {
@@ -401,9 +435,51 @@ function_definitions_llm = [
                     "type": "string",
                     "pattern": r".*/.*",
                     "description": "Path where the converted file will be saved."
+                },
+                "format": {  
+                    "type": "string",
+                    "description": "Format to convert the Markdown to (e.g., html, pdf).",
+                    "default": "html"
                 }
             },
             "required": ["md_path", "output_path"]
+        }
+    },
+    {
+        "name": "B10",
+        "description": "API endpoint that filters a CSV file and returns JSON data.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "csv_file_path": {
+                    "type": "string",
+                    "description": "Path to the CSV file."
+                },
+                "filters": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "column": {
+                                "type": "string",
+                                "description": "Name of the column to filter."
+                            },
+                            "operator": {
+                                "type": "string",
+                                "enum": ["=", "!=", ">", "<", ">=", "<=", "contains"],
+                                "description": "Comparison operator."
+                            },
+                            "value": {
+                                "type": "string",
+                                "description": "Value to compare against."
+                            }
+                        },
+                        "required": ["column", "operator", "value"]
+                    },
+                    "description": "Array of filter objects. Each object specifies a column, operator, and value."
+                }
+            },
+            "required": ["csv_file_path", "filters"]
         }
     }
 
@@ -474,6 +550,8 @@ async def run_task(task: str):
             B12(**json.loads(arguments))
         if "B3" == task_code:
             B3(**json.loads(arguments))
+        if "B4" == task_code:
+            B4(**json.loads(arguments))
         if "B5" == task_code:
             B5(**json.loads(arguments))
         if "B6" == task_code:
@@ -482,6 +560,8 @@ async def run_task(task: str):
             B7(**json.loads(arguments))
         if "B9" == task_code:
             B9(**json.loads(arguments))
+        if "B10" == task_code:
+            B10(**json.loads(arguments))
         return {"message": f"{task_code} Task '{task}' executed successfully"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

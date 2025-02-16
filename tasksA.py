@@ -8,6 +8,12 @@ import os
 import requests
 from scipy.spatial.distance import cosine
 from dotenv import load_dotenv
+import pytesseract
+from PIL import Image, ImageFilter, ImageEnhance
+import re
+import os
+from fastapi import HTTPException  # Or your preferred exception class
+
 
 load_dotenv()
 
@@ -27,13 +33,36 @@ def A1(email="23f1002075@ds.study.iitm.ac.in"):
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=f"Error: {e.stderr}")
 # A1()
-def A2(prettier_version="prettier@3.4.2", filename="/data/format.md"):
-    command = [r"C:\Program Files\nodejs\npx.cmd", prettier_version, "--write", filename]
+def A2():
+    file_path = "/data/format.md"
+    if not os.path.isfile(file_path):
+        raise HTTPException(f"File {file_path} does not exist.")
+    # cmd = ["npx", "prettier@3.4.2", "--write", file_path]
     try:
-        subprocess.run(command, check=True)
-        print("Prettier executed successfully.")
+        # Install/Update Prettier
+        subprocess.check_call(['npm', 'install', "prettier@3.4.2", '--no-package-lock'])
+        subprocess.check_call(['npm', 'list', "prettier@3.4.2"])
+        # Run Prettier
+        cmd = ["npx", "prettier@3.4.2", "--write", file_path]
+        subprocess.check_call(cmd)
+        return "Task A2 completed."
+
     except subprocess.CalledProcessError as e:
-        print(f"An error occurred: {e}")
+        raise HTTPException(f"Prettier or npm install failed: {e}")
+    except FileNotFoundError:
+        raise HTTPException("npm or npx is not found. Please install Node.js and npm.")
+    except Exception as e:
+        raise HTTPException(f"An unexpected error occurred: {e}")
+
+# def A2(prettier_version="prettier@3.4.2", filename="/data/format.md"):
+#     command = [r"C:\Program Files\nodejs\npx.cmd", prettier_version, "--write", filename]
+#     try:
+#         subprocess.run(command, check=True)
+#         print("Prettier executed successfully.")
+#     except subprocess.CalledProcessError as e:
+#         print(f"An error occurred: {e}")
+
+    
 
 def A3(filename='/data/dates.txt', targetfile='/data/dates-wednesdays.txt', weekday=2):
     input_file = filename
@@ -122,41 +151,13 @@ def png_to_base64(image_path):
     with open(image_path, "rb") as image_file:
         base64_string = base64.b64encode(image_file.read()).decode('utf-8')
     return base64_string
-# def A8():
-#     input_image = "data/credit_card.png"
-#     output_file = "data/credit-card.txt"
 
-#     # Step 1: Extract text using OCR
-#     try:
-#         image = Image.open(input_image)
-#         extracted_text = pytesseract.image_to_string(image)
-#         print(f"Extracted text:\n{extracted_text}")
-#     except Exception as e:
-#         print(f"❌ Error reading or processing {input_image}: {e}")
-#         return
-
-#     # Step 2: Pass the extracted text to the LLM to validate and extract card number
-#     prompt = f"""Extract the credit card number from the following text. Respond with only the card number, without spaces:
-
-#     {extracted_text}
-#     """
-#     try:
-#         card_number = ask_llm(prompt).strip()
-#         print(f"Card number extracted by LLM: {card_number}")
-#     except Exception as e:
-#         print(f"❌ Error processing with LLM: {e}")
-#         return
-
-#     # Step 3: Save the extracted card number to a text file
-#     try:
-#         with open(output_file, "w", encoding="utf-8") as file:
-#             file.write(card_number + "\n")
-#         print(f"✅ Credit card number saved to: {output_file}")
-#     except Exception as e:
-#         print(f"❌ Error writing {output_file}: {e}")
 
 def A8(filename='/data/credit_card.txt', image_path='/data/credit_card.png'):
     # Construct the request body for the AIProxy call
+    if not os.path.isfile(image_path):
+        raise HTTPException(f"Image file {image_path} does not exist.")
+    
     body = {
         "model": "gpt-4o-mini",
         "messages": [
@@ -182,21 +183,30 @@ def A8(filename='/data/credit_card.txt', image_path='/data/credit_card.png'):
         "Content-Type": "application/json",
         "Authorization": f"Bearer {AIPROXY_TOKEN}"
     }
-
+    try:
     # Make the request to the AIProxy service
-    response = requests.post("http://aiproxy.sanand.workers.dev/openai/v1/chat/completions",
-                             headers=headers, data=json.dumps(body))
-    # response.raise_for_status()
+        response = requests.post("http://aiproxy.sanand.workers.dev/openai/v1/chat/completions",
+                                headers=headers, data=json.dumps(body))
+        response.raise_for_status()
 
-    # Extract the credit card number from the response
-    result = response.json()
-    # print(result); return None
-    card_number = result['choices'][0]['message']['content'].replace(" ", "")
+        # Extract the credit card number from the response
+        result = response.json()
+        # print(result); return None
+        if 'choices' in result and len(result['choices']) > 0 and 'message' in result['choices'][0] and 'content' in result['choices'][0]['message']:
+            card_number = result['choices'][0]['message']['content'].strip().replace(" ", "")  # Remove spaces and whitespace
+            with open(filename, 'w') as file:
+                file.write(card_number)
+            return "Task A8 completed."
+        else:
+            raise HTTPException("Invalid response format from LLM API. Could not extract card number.")
 
-    # Write the extracted card number to the output file
-    with open(filename, 'w') as file:
-        file.write(card_number)
-# A8()
+    except requests.exceptions.RequestException as e:  # Catch network errors
+        raise HTTPException(f"Error communicating with LLM API: {e}")
+    except (KeyError, IndexError) as e: # Catch JSON parsing errors
+        raise HTTPException(status_code=500, detail=f"Error parsing LLM API response: {e}. Response: {response.text}") 
+    except Exception as e:
+        raise HTTPException(f"An unexpected error occurred: {e}")
+
 
 
 
